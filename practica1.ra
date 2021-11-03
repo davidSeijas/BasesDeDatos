@@ -1,0 +1,83 @@
+
+-- Para procesar este archivo (se puede especificar también la ruta): /process datos.ra
+-- Antes debéis crear las relaciones (tablas).
+-- Falta la última tupla de cada tabla y debéis escribir vosotros la instrucción de inserción en cada caso
+
+-- ALEJANDRO RAMÍREZ Y DAVID SEIJAS
+
+/abolish
+/multiline on
+
+create table programadores(dni string primary key, nombre string,
+dirección string, teléfono string);
+insert into programadores(dni, nombre, dirección, teléfono) values('1','Jacinto','Jazmín 4','91-8888888');
+insert into programadores(dni, nombre, dirección, teléfono) values('2','Herminia','Rosa 4','91-7777777');
+insert into programadores(dni, nombre, dirección, teléfono) values('3','Calixto','Clavel 3','91-1231231');
+insert into programadores(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+
+create table analistas(dni string primary key, nombre string,
+dirección string, teléfono string);
+insert into analistas(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+insert into analistas(dni, nombre, dirección, teléfono) values('5','Evaristo','Luna 1','91-1111111');
+insert into analistas(dni, nombre, dirección, teléfono) values('6','Luciana','Júpiter 2','91-8888888');
+insert into analistas(dni, nombre, dirección, teléfono) values('7','Nicodemo','Plutón 3',NULL);
+
+-- Para crear una clave primaria de más de un atributo hay que añadir al final como si fuese otro campo lo siguiente: primary key (códigopr, dniemp)
+
+create table distribución(códigopr string, dniemp string, horas int, primary key (códigopr, dniemp));
+insert into distribución(códigopr, dniemp, horas) values('P1','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P1','2',40);
+insert into distribución(códigopr, dniemp, horas) values('P1','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P2','4',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','3',40);
+insert into distribución(códigopr, dniemp, horas) values('P3','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P3','5',30);
+insert into distribución(códigopr, dniemp, horas) values('P4','4',20);
+insert into distribución(códigopr, dniemp, horas) values('P4','5',10);
+
+create table proyectos(código string, descripción string, dnidir string);
+insert into proyectos(código, descripción, dnidir) values('P1','Nómina','4');
+insert into proyectos(código, descripción, dnidir) values('P2','Contabilidad','4');
+insert into proyectos(código, descripción, dnidir) values('P3','Producción','5');
+insert into proyectos(código, descripción, dnidir) values('P4','Clientes','5');
+insert into proyectos(código, descripción, dnidir) values('P5','Ventas','6');
+
+-- Vista 1;
+empleados := programadores union analistas;
+vista1 := project dni (empleados);
+
+-- Vista 2;
+empleados2 := programadores intersect analistas;
+vista2 := project dni (empleados2);
+
+-- Vista3
+dniEmpleados := project dni (empleados);
+dniTrabajo := (project dniemp (distribución)) union (project dnidir (proyectos));
+vista3 := dniEmpleados difference dniTrabajo;
+
+-- Vista4
+proyAsignados := project códigopr (select dniemp=dni (distribución product analistas));
+vista4 := (project código (proyectos)) difference proyAsignados;
+
+-- Vista5
+dniAnalistas := project dni (empleados difference programadores);
+vista5 := project dnidir (select dnidir=dni (proyectos product dniAnalistas));
+
+-- Vista6
+progAsignados := project códigopr, nombre, horas (select dniemp=dni(distribución product programadores));
+vista6 := project descripción, nombre, horas (select códigopr=código (progAsignados product proyectos));
+
+-- vista6 := project descripción, nombre, horas (select dniemp=dni AND códigopr=código (proyectos product programadores product distribución));
+
+-- Vista7
+empleados3 := rename empleados3(dni2, nombre2, dirección2, teléfono2) (empleados);
+vista7 := project teléfono (select dni<>dni2 AND teléfono=teléfono2 (empleados product empleados2));
+
+select true (vista1);
+select true (vista2);
+select true (vista3);
+select true (vista4);
+select true (vista5);
+select true (vista6);
+select true (vista7);

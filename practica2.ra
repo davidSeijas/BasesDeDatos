@@ -1,0 +1,141 @@
+
+-- Para procesar este archivo (se puede especificar también la ruta): /process datos.ra
+-- Antes debéis crear las relaciones (tablas).
+-- Falta la última tupla de cada tabla y debéis escribir vosotros la instrucción de inserción en cada caso
+
+-- ALEJANDRO RAMÍREZ Y DAVID SEIJAS
+
+/abolish
+/multiline on
+
+create table programadores(dni string primary key, nombre string,
+dirección string, teléfono string);
+insert into programadores(dni, nombre, dirección, teléfono) values('1','Jacinto','Jazmín 4','91-8888888');
+insert into programadores(dni, nombre, dirección, teléfono) values('2','Herminia','Rosa 4','91-7777777');
+insert into programadores(dni, nombre, dirección, teléfono) values('3','Calixto','Clavel 3','91-1231231');
+insert into programadores(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+
+create table analistas(dni string primary key, nombre string,
+dirección string, teléfono string);
+insert into analistas(dni, nombre, dirección, teléfono) values('4','Teodora','Petunia 3','91-6666666');
+insert into analistas(dni, nombre, dirección, teléfono) values('5','Evaristo','Luna 1','91-1111111');
+insert into analistas(dni, nombre, dirección, teléfono) values('6','Luciana','Júpiter 2','91-8888888');
+insert into analistas(dni, nombre, dirección, teléfono) values('7','Nicodemo','Plutón 3',NULL);
+
+-- Para crear una clave primaria de más de un atributo hay que añadir al final como si fuese otro campo lo siguiente: primary key (códigopr, dniemp)
+
+create table distribución(códigopr string, dniemp string, horas int, primary key (códigopr, dniemp));
+insert into distribución(códigopr, dniemp, horas) values('P1','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P1','2',40);
+insert into distribución(códigopr, dniemp, horas) values('P1','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P2','4',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','1',10);
+insert into distribución(códigopr, dniemp, horas) values('P3','3',40);
+insert into distribución(códigopr, dniemp, horas) values('P3','4',5);
+insert into distribución(códigopr, dniemp, horas) values('P3','5',30);
+insert into distribución(códigopr, dniemp, horas) values('P4','4',20);
+insert into distribución(códigopr, dniemp, horas) values('P4','5',10);
+
+create table proyectos(código string, descripción string, dnidir string);
+insert into proyectos(código, descripción, dnidir) values('P1','Nómina','4');
+insert into proyectos(código, descripción, dnidir) values('P2','Contabilidad','4');
+insert into proyectos(código, descripción, dnidir) values('P3','Producción','5');
+insert into proyectos(código, descripción, dnidir) values('P4','Clientes','5');
+insert into proyectos(código, descripción, dnidir) values('P5','Ventas','6');
+
+empleados:= programadores union analistas;
+empleados1 := rename empleados1(dniemp, nombre, dirección, teléfono)(empleados);
+
+-- Vista 1;
+
+vista1 := project dni (programadores njoin analistas);
+
+-- Vista 2;
+
+horas := project dniemp, horas (distribución);
+horasEmpleado :=  group_by dniemp dniemp,sum(horas) true (distribución);
+
+empquetrabajan := project dniemp, nombre, dirección, teléfono (empleados1 njoin distribución);
+
+empquenotrabajan:= project dniemp(empleados1 difference empquetrabajan);
+horasporemp := project dniemp,0 (empquenotrabajan nljoin horasEmpleado);
+vista2 :=  horasporemp  union horasEmpleado;
+
+-- Vista3
+
+empleadosyprojects := project dniemp, nombre, códigopr (empleados1 njoin distribución);
+empleadosquenotrabajan := project dniemp,nombre (empleados1 difference empquetrabajan);
+vista3:= empleadosyprojects union (empleadosquenotrabajan nljoin empleadosyprojects);
+
+-- Vista4
+
+vista4 := project dniemp, nombre (select teléfono is null (empleados1));
+
+-- Vista5
+
+proyectosEmpleado := group_by dniemp dniemp, count (dniemp) true (distribución);
+horasEmpleado1 := rename horasEmpleado1 (dniemp,numHoras) (horasEmpleado); 
+proyectosEmpleado1 := rename proyectosEmpleado1 (dniemp,numProyect) (proyectosEmpleado);
+infoEmpleado := horasEmpleado1 njoin proyectosEmpleado1;
+infoEmpleadoMedia := project dniemp, numHoras/numProyect (infoEmpleado); -- UTIL
+infoEmpleadoMedia1 := rename infoEmpleadoMedia1 (dniemp,mediaHoras) (infoEmpleadoMedia);
+
+
+horasProyecto := group_by códigopr códigopr, sum(horas) true (distribución);
+empleadosProyecto := group_by códigopr códigopr, count(dniemp) true (distribución);
+horasProyecto1 := rename horasProyecto1 (códigopr,numHoras) (horasProyecto); 
+empleadosProyecto1 := rename empleadosProyecto1 (códigopr,numEmp) (empleadosProyecto);
+infoProyecto := horasProyecto1 njoin empleadosProyecto1;
+infoProyectoMedia := project códigopr, numHoras/numEmp (infoProyecto); -- UTIL
+infoProyectoMedia1 := rename infoProyectoMedia1 (códigopr,media) (infoProyectoMedia);
+
+aux := group_by [] (sum(media)/count(códigopr)) true (infoProyectoMedia1);
+aux1 := rename aux1 (media) (aux);
+-- aux = mediaProyectoentreEmpleado
+solucion := infoEmpleadoMedia1 product aux1;
+vista5 := project dniemp, mediaHoras (select mediaHoras<media (solucion));
+
+-- Vista6
+
+dnievaristo := project dniemp(select nombre = 'Evaristo' (empleados1));
+proyEv := project códigopr (distribución njoin dnievaristo);
+proysinevar := (project códigopr (distribución)) difference proyEv;
+proysinevarAmp := proysinevar njoin distribución;
+vista6 := project dniemp, códigopr, horas + (horas*0.2) (proysinevarAmp);
+
+
+-- Vista7
+
+dnisolucion := (project dniemp,códigopr (distribución)) division proyEv;
+vista7 := dnisolucion difference (project dniemp (select nombre='Evaristo'(empleados1)));
+
+-- Vista8
+
+proyEvcondniemp := distribución njoin proyEv;
+empleadosenproy := group_by dniemp dniemp,count(dniemp) true(proyEvcondniemp);
+empleadosenProy1 := rename empleadosenProy1 (dniemp,numVeces)(empleadosenproy);
+vecesEv := project numVeces (empleadosenProy1 njoin dnievaristo);
+vista8 := (project dniemp(empleadosenProy1 njoin vecesEv))difference dnievaristo;
+
+-- Vista9
+ dniEv := rename dniEv(dnidir)(dnievaristo);
+proyectos1 := rename proyectos1 (códigopr, descripción, dnidir) (proyectos);
+-- proydirEv := project códigopr (proyectos njoin dniEv);
+tieneDirector := (project códigopr, dniemp(distribución)) njoin (project códigopr, dnidir (proyectos1));
+tieneDirectorBueno := project dniemp, dnidir (tieneDirector);
+
+
+director(dniemp, dnidir) := project dniemp,dnidir (tieneDirectorBueno njoin dniEv) union
+project e1,d2 (rename d1(e1,d1) (tieneDirectorBueno) zjoin d1=e2 rename d2(e2,d2) (director));
+
+vista9 := project dniemp (director) difference dnievaristo; 
+
+select true (vista1);
+select true (vista2);
+select true (vista3);
+select true (vista4);
+select true (vista5);
+select true (vista6);
+select true (vista7);
+select true (vista8);
+select true (vista9);

@@ -1,0 +1,237 @@
+
+-- Para procesar este archivo (se puede especificar también la ruta): /process datos.ra
+-- Antes debéis crear las relaciones (tablas).
+-- Falta la última tupla de cada tabla y debéis escribir vosotros la instrucción de inserción en cada caso
+
+-- ALEJANDRO RAMÍREZ Y DAVID SEIJAS
+
+/abolish
+/multiline on
+/duplicates on
+/type_casting on
+/datalog
+/SQL
+
+create table programadores(dni string primary key, nombre string, dirección string, teléfono string);
+insert into programadores values('1','Jacinto','Jazmín 4','91-8888888');
+insert into programadores values('2','Herminia','Rosa 4','91-7777777');
+insert into programadores values('3','Calixto','Clavel 3','91-1231231');
+insert into programadores values('4','Teodora','Petunia 3','91-6666666');
+
+create table analistas(dni string primary key, nombre string, dirección string, teléfono string);
+insert into analistas values('4','Teodora','Petunia 3','91-6666666');
+insert into analistas values('5','Evaristo','Luna 1','91-1111111');
+insert into analistas values('6','Luciana','Júpiter 2','91-8888888');
+insert into analistas values('7','Nicodemo','Plutón 3',NULL);
+
+create table distribución(códigoPr string, dniEmp string, horas int, primary key (códigoPr, dniEmp));
+insert into distribución values('P1','1',10);
+insert into distribución values('P1','2',40);
+insert into distribución values('P1','4',5);
+insert into distribución values('P2','4',10);
+insert into distribución values('P3','1',10);
+insert into distribución values('P3','3',40);
+insert into distribución values('P3','4',5);
+insert into distribución values('P3','5',30);
+insert into distribución values('P4','4',20);
+insert into distribución values('P4','5',10);
+
+create table proyectos(código string primary key, descripción string, dniDir string);
+insert into proyectos values('P1','Nómina','4');
+insert into proyectos values('P2','Contabilidad','4');
+insert into proyectos values('P3','Producción','5');
+insert into proyectos values('P4','Clientes','5');
+insert into proyectos values('P5','Ventas','6');
+
+create view empleados as 
+select * from analistas union select * from programadores;
+
+
+-- vista 1
+
+create view vista1 as 
+select dni from empleados;
+
+-- vista 2
+
+create view vista2 as 
+select dni from analistas intersect select dni from programadores;
+
+-- vista 3
+
+create view dniCon as 
+select distinct dniEmp from distribución
+union
+select distinct dniDir from proyectos;
+
+create view vista3 as
+select * from vista1 except select * from dniCon;
+
+-- vista 4
+
+create view dniAnalistas as
+select dni from analistas;
+create view proyAnalistas as
+select distinct códigoPr from distribución, dniAnalistas 
+where distribución.dniEmp = dniAnalistas.dni;
+
+create view vista4 as
+select código from proyectos except select * from proyAnalistas;
+
+-- vista 5
+
+create view dniOnlyAn as
+select dni from analistas except select * from vista2;
+
+create view vista5 as
+select distinct dniDir from proyectos intersect select * from dniOnlyAn;
+-- select distinct dniDir from proyectos,dniOnlyAn 
+-- where proyectos.dniDir = dniOnlyAn.dni;
+
+-- vista 6
+
+create view vista6 as
+select descripción, nombre, horas from proyectos, distribución, programadores 
+where proyectos.código = distribución.códigoPr and 
+distribución.dniEmp = programadores.dni;
+
+-- vista 7
+
+create view vista7 as
+select distinct empleados.teléfono from empleados, empleados as empleados1
+where empleados.teléfono = empleados1.teléfono and 
+empleados.dni <> empleados1.dni;
+
+-- vista 8
+
+create view vista8 as
+select dni from analistas natural join programadores;
+
+
+-- vista 9
+
+create view vista9 as
+select dniEmp, sum(horas) as horas from distribución group by dniEmp;
+
+-- vista 10
+
+create view vista10 as
+select dni, nombre, códigoPr from empleados left join distribución 
+on empleados.dni = distribución.dniEmp;
+
+-- vista 11
+
+create view vista11 as
+select dni, nombre from empleados where teléfono is null;
+
+-- vista12
+
+create view r1 as
+select dniEmp, avg(horas) as mediaE from distribución group by dniEmp;
+create view r2 as
+select códigoPr, avg(horas) as mediaP from distribución group by códigoPr;
+create view r3 as
+select avg(mediaP) as mediaT from r2;
+
+create view vista12 as
+select dniEmp from r1, r3 where mediaE < mediaT;
+
+
+-- vista 13
+
+create view dniEv as
+select dni as dniEv from empleados where nombre = 'Evaristo';
+
+create view proyEv as
+select códigoPr from distribución inner join dniEv
+on dniEv=dniEmp;
+-- proyectos donde trabaja evaristo
+
+create view vista13 as
+select dniEmp from (select códigoPr, dniEmp from distribución) division proyEv;
+
+-- vista 14
+
+create view r14 as
+select distinct dniEmp, count(dniEmp) as numProy from distribución natural inner join proyEv group by dniEmp; 
+create view vista14 as 
+select distinct dniEmp from r14 where numProy = (select count(códigoPr) from proyEv);
+
+-- cogemos los dni de los empleados que trabajan en proyectos donde trabaja evaristo con el numero de proyectos en los que trabaja de esos, y luego de esos nos quedamos con los que trabajan en el mismo numero de proyectos de los de antes que el numero de proyectos donde trabaja evaristo
+
+-- vista 15
+
+create view empConEv as
+select distinct dniEmp from distribución natural inner join proyEv; 
+-- empleados que trabajan con evaristo
+create view empSinEv as 
+select dniEmp from distribución except select dniEmp from empConEv;
+-- empleados que no trabajan con evaristo
+
+create view vista15 as select códigoPr,dniEmp, horas + horas*0.2 from distribución natural join empSinEv;
+
+
+-- create view vista15 as
+-- select distinct * from distribución natural inner join empSinEv;
+-- update vista15 set horas = horas * 1.2; -- no funciona
+
+-- vista 16
+
+-- 1forma:
+-- create view proydirEv as select código as códigoPr,dniEv from proyectos inner join dniEv on dniDir=dniEv;
+
+-- create view empRelEv as select distinct dniEmp, dniEv as dniDir from distribución natural join proydirEv;
+
+-- create view empRel as 
+-- select distinct dniEmp,dniDir from distribución inner join proyectos on código=códigoPr;
+
+-- create view r16  as
+-- with relacion (dniEmp) as
+-- (select distinct dniEmp from empRelEv union (select distinct empRel.dniEmp from relacion,empRel where relacion.dniEmp=empRel.dniDir))
+-- select * from relacion except select * from dniEv;
+-- create view vista16 as select nombre from empleados inner join r16 on dni=dniEmp;
+
+
+
+-- 2a forma: 
+create view proyDirEv as
+select código as códigoPr from proyectos, dniEv where dniDir = dniEv;
+-- proyectos dirigidos por evaristo
+create view emp_dir as
+select distinct dniEmp, dniDir from distribución inner join proyectos on códigoPr = código;
+-- relacion empleados con sus directores
+create view empEv as
+select distinct dniEmp, dniDir from emp_dir inner join dniEv on dniDir = dniEv;
+-- empleados dirigidos por evaristo
+
+create view dniAsocEv as 
+with asocEv(dniEmp, dniDir) as 
+(select * from empEv union select emp_dir.dniEmp, asocEv.dniDir from emp_dir, asocEv 
+where emp_dir.dniDir = asocEv.dniEmp) 
+select dniEmp from asocEv except select dniEv from dniEv;
+
+create view vista16 as
+select nombre from empleados inner join dniAsocEv on dni = dniEmp;
+
+-- 
+
+select * from vista1;
+select * from vista2;
+select * from vista3;
+select * from vista4;
+select * from vista5;
+select * from vista6;
+select * from vista7;
+select * from vista8;
+select * from vista9;
+select * from vista10;
+select * from vista11;
+select * from vista12;
+select * from vista13;
+select * from vista14;
+select * from vista15;
+select * from vista16;
+
+
+
+/multiline off 
